@@ -19,6 +19,7 @@ Next, generate the training dataset with:
 ```sh
 gensfen depth 8 loop 100000000
 ```
+This process will create a binary file in the same directory as the SFEN generator. Rename it to `train.bin` and move it to the project root.
 
 ### 3. Training the NNUE Model
 Run the following command to start the training process:
