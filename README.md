@@ -1,7 +1,7 @@
 # NNUE-kit
 
 ## Overview
-This project is designed to help users train an NNUE (Efficiently Updatable Neural Network) and integrate it into their chess engines using the NNUE probe and provided examples.
+This project is designed to help users train an NNUE (Efficiently Updatable Neural Network) and integrate it into their chess engines using the NNUE probes and provided examples.
 
 ## Getting Started
 ### 1. Generating Validation Data
@@ -40,18 +40,34 @@ python main.py quantize
 ```
 This will convert the checkpoint into a `.jnn` file.
 
-### 5. Installing the NNUE Probe
+## NNUE Probes
+There are two NNUE probes available: **Rust** and **Python**.
+- **Python NNUE Probe**: Easy to use but has a slow inference time.
+- **Rust NNUE Probe**: Faster inference but requires ~10 seconds to initialize the NNUE.
+
+### Installing the NNUE Probe
+#### Python Probe
 Navigate to the folder containing `setup.py` (included with the NNUE probe) and install it:
 ```sh
 python setup.py install
 ```
+#### Rust Probe
+Install the Rust probe by either:
+1. Downloading the `.whl` file from the [Releases](https://github.com/FireFather/sf-nnue-aio/releases/tag/08-01-2022-AIO) section and installing it:
+   ```sh
+   pip install <downloaded_whl_file>
+   ```
+2. Building it manually using `maturin`:
+   ```sh
+   maturin build
+   pip install target/wheel/*.whl
+   ```
 
 ### 6. Using the NNUE Probe
-Refer to `example.py` to understand how the probe works and integrate it into your own project.
+Refer to `example.py` to understand how the probes work and integrate them into your own project.
 
 ## Pre-Trained NNUE
-Since training can take a significant amount of time, a pre-trained NNUE is available in the [Releases](https://github.com/github-jimjim/NNUE-kit/releases/).
-Make sure to leave a star if that helped you. :)
+Since training can take a significant amount of time, a pre-trained NNUE is available in the [Releases](https://github.com/FireFather/sf-nnue-aio/releases/tag/08-01-2022-AIO).
 
 ## Acknowledgments
 Special thanks to:
