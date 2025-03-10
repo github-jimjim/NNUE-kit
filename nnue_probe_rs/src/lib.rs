@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use byteorder::{LittleEndian, ReadBytesExt};
 use chess::{Board, BitBoard, Color, Piece, Square};
 use pyo3::prelude::*;
@@ -13,7 +13,7 @@ const HL1_OUTPUT_DIM: usize = 32;
 const HL2_OUTPUT_DIM: usize = 32;
 
 struct Model {
-	ft_weights: Vec<i16>, 
+    ft_weights: Vec<i16>, 
     ft_biases: Vec<i16>,
 
     hl1_weights: Vec<i8>, 
@@ -30,24 +30,24 @@ static MODEL: OnceCell<Model> = OnceCell::new();
 
 #[pyfunction]
 fn init_nnue(nnue_path: &str) -> PyResult<()> {
-    let mut file = File::open(nnue_path)
+    let file = File::open(nnue_path)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    let mut reader = BufReader::new(file);
 
-    let version = file.read_u32::<LittleEndian>()
+    let version = reader.read_u32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    let hash_value = file.read_u32::<LittleEndian>()
+    let hash_value = reader.read_u32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    let size = file.read_u32::<LittleEndian>()
+    let size = reader.read_u32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))? as usize;
     let mut arch_bytes = vec![0u8; size];
-    file.read_exact(&mut arch_bytes)
+    reader.read_exact(&mut arch_bytes)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let arch = String::from_utf8_lossy(&arch_bytes);
     println!("Version: {}", version);
     println!("Hash: {}", hash_value);
-    println!("Architecture: {}", arch);
 
-    let ft_header = file.read_u32::<LittleEndian>()
+    let ft_header = reader.read_u32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let associated_halfkp_king: u32 = 1;
     let output_dimensions = 2 * FEATURE_TRANSFORMER_HALF_DIMENSIONS as u32;
@@ -55,28 +55,25 @@ fn init_nnue(nnue_path: &str) -> PyResult<()> {
     if ft_header != expected_hash {
         return Err(pyo3::exceptions::PyValueError::new_err("Header passt nicht zum erwarteten Hash!"));
     }
+
     let mut ft_biases = vec![0i16; FEATURE_TRANSFORMER_HALF_DIMENSIONS];
-    for i in 0..FEATURE_TRANSFORMER_HALF_DIMENSIONS {
-        ft_biases[i] = file.read_i16::<LittleEndian>()
-            .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    }
+    reader.read_i16_into::<LittleEndian>(&mut ft_biases)
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+
     let ft_weights_count = FEATURE_TRANSFORMER_HALF_DIMENSIONS * FT_INPUT_DIM;
     let mut ft_weights = vec![0i16; ft_weights_count];
-    for i in 0..ft_weights_count {
-        ft_weights[i] = file.read_i16::<LittleEndian>()
-            .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    }
+    reader.read_i16_into::<LittleEndian>(&mut ft_weights)
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
 
-    let _header = file.read_u32::<LittleEndian>()
+    let _header = reader.read_u32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let mut hl1_biases = vec![0i32; HL1_OUTPUT_DIM];
-    for i in 0..HL1_OUTPUT_DIM {
-        hl1_biases[i] = file.read_i32::<LittleEndian>()
-            .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    }
+    reader.read_i32_into::<LittleEndian>(&mut hl1_biases)
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    
     let hl1_weights_count = HL1_INPUT_DIM * HL1_OUTPUT_DIM;
     let mut hl1_weights = vec![0i8; hl1_weights_count];
-    file.read_exact(unsafe {
+    reader.read_exact(unsafe {
         std::slice::from_raw_parts_mut(
             hl1_weights.as_mut_ptr() as *mut u8,
             hl1_weights_count * std::mem::size_of::<i8>(),
@@ -84,33 +81,33 @@ fn init_nnue(nnue_path: &str) -> PyResult<()> {
     }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
 
     let mut hl2_biases = vec![0i32; HL2_OUTPUT_DIM];
-    for i in 0..HL2_OUTPUT_DIM {
-        hl2_biases[i] = file.read_i32::<LittleEndian>()
-            .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    }
+    reader.read_i32_into::<LittleEndian>(&mut hl2_biases)
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    
     let hl2_weights_count = HL2_OUTPUT_DIM * HL2_OUTPUT_DIM;
     let mut hl2_weights = vec![0i8; hl2_weights_count];
-    file.read_exact(unsafe {
+    reader.read_exact(unsafe {
         std::slice::from_raw_parts_mut(
             hl2_weights.as_mut_ptr() as *mut u8,
             hl2_weights_count * std::mem::size_of::<i8>(),
         )
     }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
 
-    let out_bias = file.read_i32::<LittleEndian>()
+    let out_bias = reader.read_i32::<LittleEndian>()
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let mut out_weights = vec![0i8; HL2_OUTPUT_DIM];
-    file.read_exact(unsafe {
+    reader.read_exact(unsafe {
         std::slice::from_raw_parts_mut(
             out_weights.as_mut_ptr() as *mut u8,
             HL2_OUTPUT_DIM * std::mem::size_of::<i8>(),
         )
     }).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
 
-    let current_pos = file.seek(SeekFrom::Current(0))
+    let current_pos = reader.seek(SeekFrom::Current(0))
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    let end_pos = file.seek(SeekFrom::End(0))
-        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    let end_pos = reader.get_ref().metadata()
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?
+        .len();
     if end_pos - current_pos != 0 {
         return Err(pyo3::exceptions::PyValueError::new_err("Es wurden nicht alle Parameter gelesen!"));
     }
