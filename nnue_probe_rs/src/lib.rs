@@ -202,7 +202,7 @@ fn py_floor_div(a: i32, b: i32) -> i32 {
 }
 
 fn nn_value_to_centipawn(nn_value: i32) -> f32 {
-    let v = py_floor_div(nn_value, 16);
+    let v = py_floor_div(nn_value, 8);
     let v = py_floor_div(v * 100, 208);
     (v as f32) / 100.0
 }
